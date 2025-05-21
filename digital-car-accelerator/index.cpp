@@ -1,97 +1,146 @@
-// Display segment codes for 0-9, E, r
-const unsigned char SEGMENT_CODES[] = {0x40, 0x79, 0x24, 0x30, 0x19, 0x12, 0x02, 0x78, 0x80, 0x18, 0x06, 0x2F};
+// --------------------------------------------------
+// Hardware Pin Definitions
+// --------------------------------------------------
+#define DISPLAY_0_PIN PB0 // Display 0 (hundreds)
+#define DISPLAY_1_PIN PB1 // Display 1 (tens)
+#define DISPLAY_2_PIN PB2 // Display 2 (units)
+#define POT1_PIN PC0      // Potentiometer 1
+#define POT2_PIN PC1      // Potentiometer 2
 
-// Display buffer: 10 = 'E', 11 = 'r'
-unsigned char displayBuffer[3] = {10, 11, 11};
+// --------------------------------------------------
+// System Configuration Constants
+// --------------------------------------------------
+#define DISPLAY_DIGIT_COUNT 3
+#define DISPLAY_REFRESH_MS 2
+#define POT1_MIN 190
+#define POT1_MAX 833
+#define POT2_MIN 87
+#define POT2_MAX 413
+#define MAX_DIFF 10
 
-volatile unsigned int potValue1 = 0;          // Potentiometer 1 value
-volatile unsigned int potValue2 = 0;          // Potentiometer 2 value
-volatile unsigned char currentAdcChannel = 0; // ADC channel in use (0 or 1)
-volatile bool hasNewReading = false;          // Indicates if a new reading is ready
+// --------------------------------------------------
+// Segment Table for 7-segment Display (0-9, E, r)
+// --------------------------------------------------
+const unsigned char SEGMENT_TABLE[] = {0x40, 0x79, 0x24, 0x30, 0x19, 0x12, 0x02, 0x78, 0x80, 0x18, 0x06, 0x2F};
 
-unsigned char displayIndex = 0;
-unsigned long lastDisplayRefresh = 0;
-
-void setup()
+// --------------------------------------------------
+// State Structures
+// --------------------------------------------------
+typedef struct
 {
-    // Set display pins as output
-    DDRD |= 0b01111111;
-    DDRB |= 0b00000111;
-    // Set potentiometer pins as input
-    DDRC &= ~(1 << PC0);
-    DDRC &= ~(1 << PC1);
-    // ADC setup
-    ADMUX &= ~((1 << REFS0) | (1 << REFS1));              // Clear reference bits
-    ADMUX |= (1 << REFS0);                                // Set AVCC as reference
-    ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Prescaler 128
-    ADCSRA |= (1 << ADIE);                                // Enable ADC interrupt
-    ADCSRA |= (1 << ADEN);                                // Enable ADC
-    ADCSRA |= (1 << ADSC);                                // Start ADC conversion
-    sei();                                                // Enable global interrupts
-}
+    unsigned int pot1Value;   // Potentiometer 1 value
+    unsigned int pot2Value;   // Potentiometer 2 value
+    unsigned char adcChannel; // Current ADC channel
+    bool newReading;          // New ADC reading flag
+} SensorState;
 
-// Maps and constrains potentiometer readings to 0-100
+typedef struct
+{
+    unsigned char digits[DISPLAY_DIGIT_COUNT]; // Display buffer
+    unsigned char currentDigit;                // Current digit index for multiplexing
+    unsigned long lastRefresh;                 // Last display refresh time
+} DisplayState;
+
+SensorState sensors = {0};
+DisplayState display = {{10, 11, 11}, 0, 0}; // Default to 'Err'
+
+// --------------------------------------------------
+// Utility Functions
+// --------------------------------------------------
 int mapAndConstrain(int value, int min, int max)
 {
     int mapped = map(value, min, max, 0, 100);
     return constrain(mapped, 0, 100);
 }
 
-void updateDisplayBuffer(int value1, int value2)
+void updateDisplayDigits(int value1, int value2)
 {
-    // If readings are invalid or difference is too large, show error
-    if (potValue1 == 0 || potValue1 == 1023 || potValue2 == 0 || potValue2 == 1023 || abs(value1 - value2) > 10)
+    if (sensors.pot1Value == 0 || sensors.pot1Value == 1023 ||
+        sensors.pot2Value == 0 || sensors.pot2Value == 1023 ||
+        abs(value1 - value2) > MAX_DIFF)
     {
-        displayBuffer[0] = 10; // 'E'
-        displayBuffer[1] = 11; // 'r'
-        displayBuffer[2] = 11; // 'r'
+        display.digits[0] = 10; // 'E'
+        display.digits[1] = 11; // 'r'
+        display.digits[2] = 11; // 'r'
     }
     else
     {
-        int average = (value1 + value2) / 2;
-        displayBuffer[0] = average / 100;       // Hundreds
-        displayBuffer[1] = (average / 10) % 10; // Tens
-        displayBuffer[2] = average % 10;        // Units
+        int avg = (value1 + value2) / 2;
+        display.digits[0] = avg / 100;
+        display.digits[1] = (avg / 10) % 10;
+        display.digits[2] = avg % 10;
     }
 }
 
-void refreshDisplay()
+void displayDigit(unsigned char digit, unsigned char position)
 {
-    displayIndex = (displayIndex + 1) % 3;
-    PORTB = (PORTB & 0b11111000) | (1 << displayIndex); // Activate current display
-    PORTD = SEGMENT_CODES[displayBuffer[displayIndex]];
+    // Set segment value
+    PORTD = SEGMENT_TABLE[digit];
+    // Activate only the selected display
+    PORTB = (PORTB & 0b11111000) | (1 << position);
 }
 
+void updateDisplayMultiplex()
+{
+    display.lastRefresh = millis();
+    display.currentDigit = (display.currentDigit + 1) % DISPLAY_DIGIT_COUNT;
+    displayDigit(display.digits[display.currentDigit], display.currentDigit);
+}
+
+// --------------------------------------------------
+// Arduino Setup
+// --------------------------------------------------
+void setup()
+{
+    // Set display pins as output
+    DDRD |= 0b01111111;
+    DDRB |= 0b00000111;
+    // Set potentiometer pins as input
+    DDRC &= ~((1 << POT1_PIN) | (1 << POT2_PIN));
+    // ADC setup
+    ADMUX &= ~((1 << REFS0) | (1 << REFS1));
+    ADMUX |= (1 << REFS0);
+    ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+    ADCSRA |= (1 << ADIE);
+    ADCSRA |= (1 << ADEN);
+    ADCSRA |= (1 << ADSC);
+    sei();
+}
+
+// --------------------------------------------------
+// Arduino Main Loop
+// --------------------------------------------------
 void loop()
 {
-    if (hasNewReading)
+    if (sensors.newReading)
     {
-        hasNewReading = false;
-        int value1 = mapAndConstrain(potValue1, 190, 833);
-        int value2 = mapAndConstrain(potValue2, 87, 413);
-        updateDisplayBuffer(value1, value2);
+        sensors.newReading = false;
+        int value1 = mapAndConstrain(sensors.pot1Value, POT1_MIN, POT1_MAX);
+        int value2 = mapAndConstrain(sensors.pot2Value, POT2_MIN, POT2_MAX);
+        updateDisplayDigits(value1, value2);
     }
-    if (millis() > (lastDisplayRefresh + 0))
+    if (millis() - display.lastRefresh >= DISPLAY_REFRESH_MS)
     {
-        lastDisplayRefresh = millis();
-        refreshDisplay();
+        updateDisplayMultiplex();
     }
 }
 
-// ADC interrupt: reads both potentiometers without busy waiting
+// --------------------------------------------------
+// ADC Interrupt Service Routine
+// --------------------------------------------------
 ISR(ADC_vect)
 {
-    if (currentAdcChannel == 0)
+    if (sensors.adcChannel == 0)
     {
-        potValue1 = ADC;
-        currentAdcChannel = 1;
+        sensors.pot1Value = ADC;
+        sensors.adcChannel = 1;
     }
     else
     {
-        potValue2 = ADC;
-        currentAdcChannel = 0;
-        hasNewReading = true;
+        sensors.pot2Value = ADC;
+        sensors.adcChannel = 0;
+        sensors.newReading = true;
     }
-    ADMUX = (ADMUX & 0xF0) | currentAdcChannel; // Switch ADC channel
-    ADCSRA |= (1 << ADSC);                      // Start next conversion
+    ADMUX = (ADMUX & 0xF0) | sensors.adcChannel;
+    ADCSRA |= (1 << ADSC);
 }
