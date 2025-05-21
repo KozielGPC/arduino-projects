@@ -47,45 +47,50 @@ DisplayState display = {{10, 11, 11}, 0, 0}; // Padrão para 'Err'
 // --------------------------------------------------
 // Funções utilitárias
 // --------------------------------------------------
+// Mapeia e limita o valor lido do potenciômetro para o intervalo 0-100
 int mapAndConstrain(int value, int min, int max)
 {
-    int mapped = map(value, min, max, 0, 100);
-    return constrain(mapped, 0, 100);
+    int mapped = map(value, min, max, 0, 100); // mapeia para 0-100
+    return constrain(mapped, 0, 100);          // limita para não ultrapassar os extremos
 }
 
+// Atualiza o buffer de dígitos do display de acordo com os valores dos potenciômetros
 void updateDisplayDigits(int value1, int value2)
 {
-    // Se leituras inválidas ou diferença muito grande, mostra erro
+    // Se algum potenciômetro está em valor inválido ou a diferença entre eles é muito grande, mostra erro
     if (sensors.pot1Value == 0 || sensors.pot1Value == 1023 ||
         sensors.pot2Value == 0 || sensors.pot2Value == 1023 ||
         abs(value1 - value2) > MAX_DIFF)
     {
-        display.digits[0] = 10; // 'E'
+        display.digits[0] = 10; // 'E' (Erro)
         display.digits[1] = 11; // 'r'
         display.digits[2] = 11; // 'r'
     }
     else
     {
+        // Calcula a média dos dois potenciômetros e separa em centenas, dezenas e unidades
         int avg = (value1 + value2) / 2;
-        display.digits[0] = avg / 100;
-        display.digits[1] = (avg / 10) % 10;
-        display.digits[2] = avg % 10;
+        display.digits[0] = avg / 100;       // centena
+        display.digits[1] = (avg / 10) % 10; // dezena
+        display.digits[2] = avg % 10;        // unidade
     }
 }
 
+// Ativa o display correto e mostra o dígito correspondente
 void displayDigit(unsigned char digit, unsigned char position)
 {
-    // Define o valor dos segmentos
+    // Define o valor dos segmentos do display de acordo com a tabela
     PORTD = SEGMENT_TABLE[digit];
-    // Ativa apenas o display selecionado
+    // Ativa apenas o display selecionado (multiplexação)
     PORTB = (PORTB & 0b11111000) | (1 << position);
 }
 
+// Atualiza o dígito ativo do display (multiplexação)
 void updateDisplayMultiplex()
 {
-    display.lastRefresh = millis();
-    display.currentDigit = (display.currentDigit + 1) % DISPLAY_DIGIT_COUNT;
-    displayDigit(display.digits[display.currentDigit], display.currentDigit);
+    display.lastRefresh = millis();                                           // atualiza o tempo da última troca
+    display.currentDigit = (display.currentDigit + 1) % DISPLAY_DIGIT_COUNT;  // próximo dígito
+    displayDigit(display.digits[display.currentDigit], display.currentDigit); // mostra o dígito
 }
 
 // --------------------------------------------------
@@ -93,19 +98,18 @@ void updateDisplayMultiplex()
 // --------------------------------------------------
 void setup()
 {
-    // Define pinos do display como saída
+    // Configura os pinos dos displays como saída
     DDRD |= 0b01111111;
     DDRB |= 0b00000111;
-    // Define pinos dos potenciômetros como entrada
+    // Configura os pinos dos potenciômetros como entrada
     DDRC &= ~((1 << POT1_PIN) | (1 << POT2_PIN));
-    // Configuração do ADC
-    ADMUX &= ~((1 << REFS0) | (1 << REFS1));
-    ADMUX |= (1 << REFS0);
-    ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
-    ADCSRA |= (1 << ADIE);
-    ADCSRA |= (1 << ADEN);
-    ADCSRA |= (1 << ADSC);
-    sei();
+    // Configuração do ADC para leitura dos potenciômetros
+    ADMUX &= ~((1 << REFS0) | (1 << REFS1));              // limpa bits de referência
+    ADMUX |= (1 << REFS0);                                // usa AVCC como referência
+    ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // prescaler 128
+    ADCSRA |= (1 << ADIE);                                // habilita interrupção do ADC
+    ADCSRA |= (1 << ADEN);                                // habilita ADC
+    ADCSRA |= (1 << ADSC);                                // inicia primeira conversão
 }
 
 // --------------------------------------------------
@@ -113,13 +117,17 @@ void setup()
 // --------------------------------------------------
 void loop()
 {
+    // Se uma nova leitura dos potenciômetros está disponível
     if (sensors.newReading)
     {
-        sensors.newReading = false;
+        sensors.newReading = false; // reseta a flag
+        // Mapeia e limita os valores lidos para 0-100
         int value1 = mapAndConstrain(sensors.pot1Value, POT1_MIN, POT1_MAX);
         int value2 = mapAndConstrain(sensors.pot2Value, POT2_MIN, POT2_MAX);
+        // Atualiza o buffer do display
         updateDisplayDigits(value1, value2);
     }
+
     if (millis() - display.lastRefresh >= DISPLAY_REFRESH_MS)
     {
         updateDisplayMultiplex();
@@ -131,17 +139,20 @@ void loop()
 // --------------------------------------------------
 ISR(ADC_vect)
 {
+    // Alterna a leitura entre os dois potenciômetros
     if (sensors.adcChannel == 0)
     {
-        sensors.pot1Value = ADC;
-        sensors.adcChannel = 1;
+        sensors.pot1Value = ADC; // lê potenciômetro 1
+        sensors.adcChannel = 1;  // próximo canal será o 2
     }
     else
     {
-        sensors.pot2Value = ADC;
-        sensors.adcChannel = 0;
-        sensors.newReading = true;
+        sensors.pot2Value = ADC;   // lê potenciômetro 2
+        sensors.adcChannel = 0;    // próximo canal será o 1
+        sensors.newReading = true; // sinaliza que há nova leitura disponível
     }
+    // Atualiza o canal do ADC para a próxima leitura
     ADMUX = (ADMUX & 0xF0) | sensors.adcChannel;
+    // Inicia nova conversão ADC
     ADCSRA |= (1 << ADSC);
 }
