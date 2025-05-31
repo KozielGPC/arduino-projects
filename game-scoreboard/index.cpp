@@ -106,7 +106,20 @@ long timerValue, startTime = 599000;
 
 const unsigned char lcdTitle[] PROGMEM = "Cronometro";
 
+void initializeHardware();
+void initializeDisplay();
+void updateTimerValues();
+void handleButtonPress(unsigned char *score, char *units, char *tens, int *lastButtonState, int *buttonState, unsigned int *debounceTime, int pin);
+void updateDisplay();
+void updateScore(unsigned char *score, char *units, char *tens);
+
 void setup()
+{
+    initializeHardware();
+    initializeDisplay();
+}
+
+void initializeHardware()
 {
     DDRC = 0xFF;
     DDRD = 0b00111111;
@@ -114,6 +127,10 @@ void setup()
     lcdInit4Bit();
     if (startTime > 599000)
         startTime = 599000;
+}
+
+void initializeDisplay()
+{
     lcdSendCommand(0x80, 0);
     lcdSendCommand('T', 1);
     lcdSendCommand('1', 1);
@@ -123,6 +140,33 @@ void setup()
     lcdSendCommand(0x8E, 0);
     lcdSendCommand('T', 1);
     lcdSendCommand('2', 1);
+}
+
+void updateTimerValues()
+{
+    timerValue = startTime - millis();
+    minute = timerValue / 60000;
+    secondTens = (timerValue % 60000) / 10000;
+    secondUnits = (timerValue % 10000) / 1000;
+    msTens = (timerValue % 1000) / 100;
+    msUnits = (timerValue % 100) / 10;
+}
+
+void handleButtonPress(unsigned char *score, char *units, char *tens, int *lastButtonState, int *buttonState, unsigned int *debounceTime, int pin)
+{
+    int readButton = PIND & (1 << pin);
+    if (readButton != *lastButtonState)
+        *debounceTime = millis();
+    if ((millis() - *debounceTime) > DEBOUNCE_INTERVAL)
+    {
+        if (*buttonState != readButton)
+        {
+            *buttonState = readButton;
+            if (*buttonState == 0)
+                updateScore(score, units, tens);
+        }
+    }
+    *lastButtonState = readButton;
 }
 
 void updateScore(unsigned char *score, char *units, char *tens)
@@ -139,59 +183,35 @@ void updateScore(unsigned char *score, char *units, char *tens)
     *tens = *score / 10;
 }
 
+void updateDisplay()
+{
+    lcdSendCommand(0xC4, 0);
+    lcdSendCommand('0', 1);
+    lcdSendCommand(minute + '0', 1);
+    lcdSendCommand(':', 1);
+    lcdSendCommand(secondTens + '0', 1);
+    lcdSendCommand(secondUnits + '0', 1);
+    lcdSendCommand(':', 1);
+    lcdSendCommand(msTens + '0', 1);
+    lcdSendCommand(msUnits + '0', 1);
+    lcdSendCommand(0xC0, 0);
+    lcdSendCommand(score1Tens + '0', 1);
+    lcdSendCommand(score1Units + '0', 1);
+    lcdSendCommand(0xCE, 0);
+    lcdSendCommand(score2Tens + '0', 1);
+    lcdSendCommand(score2Units + '0', 1);
+}
+
 void loop()
 {
-    timerValue = startTime - millis();
+    updateTimerValues();
     if (timerValue > 0)
     {
-        minute = timerValue / 60000;
-        secondTens = (timerValue % 60000) / 10000;
-        secondUnits = (timerValue % 10000) / 1000;
-        msTens = (timerValue % 1000) / 100;
-        msUnits = (timerValue % 100) / 10;
-        int readButton1 = PIND & (1 << PD6);
-        if (readButton1 != lastButtonState1)
-            debounceTime1 = millis();
-        if ((millis() - debounceTime1) > DEBOUNCE_INTERVAL)
-        {
-            if (button1State != readButton1)
-            {
-                button1State = readButton1;
-                if (button1State == 0)
-                    updateScore(&score1, &score1Units, &score1Tens);
-            }
-        }
-        lastButtonState1 = readButton1;
-        int readButton2 = PIND & (1 << PD7);
-        if (readButton2 != lastButtonState2)
-            debounceTime2 = millis();
-        if ((millis() - debounceTime2) > DEBOUNCE_INTERVAL)
-        {
-            if (button2State != readButton2)
-            {
-                button2State = readButton2;
-                if (button2State == 0)
-                    updateScore(&score2, &score2Units, &score2Tens);
-            }
-        }
-        lastButtonState2 = readButton2;
+        handleButtonPress(&score1, &score1Units, &score1Tens, &lastButtonState1, &button1State, &debounceTime1, PD6);
+        handleButtonPress(&score2, &score2Units, &score2Tens, &lastButtonState2, &button2State, &debounceTime2, PD7);
     }
     if (millis() % 27 == 0)
     {
-        lcdSendCommand(0xC4, 0);
-        lcdSendCommand('0', 1);
-        lcdSendCommand(minute + '0', 1);
-        lcdSendCommand(':', 1);
-        lcdSendCommand(secondTens + '0', 1);
-        lcdSendCommand(secondUnits + '0', 1);
-        lcdSendCommand(':', 1);
-        lcdSendCommand(msTens + '0', 1);
-        lcdSendCommand(msUnits + '0', 1);
-        lcdSendCommand(0xC0, 0);
-        lcdSendCommand(score1Tens + '0', 1);
-        lcdSendCommand(score1Units + '0', 1);
-        lcdSendCommand(0xCE, 0);
-        lcdSendCommand(score2Tens + '0', 1);
-        lcdSendCommand(score2Units + '0', 1);
+        updateDisplay();
     }
 }
