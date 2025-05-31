@@ -215,29 +215,42 @@ void lcdCreateChar(uint8_t location, const uint8_t *charmap)
 
 void displayLayout()
 {
-    // Linha 1: A:placar1   B:placar2
-    lcdSendCommand(0x80, 0); // Início da linha 1
-    lcdSendCommand('A', 1);
-    lcdSendCommand(':', 1);
-    lcdSendCommand(scoreButton1.tens + '0', 1);
-    lcdSendCommand(scoreButton1.units + '0', 1);
-    lcdSendCommand(' ', 1);
-    lcdSendCommand(' ', 1);
-    lcdSendCommand('B', 1);
-    lcdSendCommand(':', 1);
-    lcdSendCommand(scoreButton2.tens + '0', 1);
-    lcdSendCommand(scoreButton2.units + '0', 1);
+    // Linha 1: __A: 00   __   __   __   __   B:00
+    lcdSendCommand(0x80, 0);                     // Início da linha 1
+    lcdSendCommand(' ', 1);                      // 1º posição
+    lcdSendCommand(' ', 1);                      // 2º posição
+    lcdSendCommand('A', 1);                      // 3º posição
+    lcdSendCommand(':', 1);                      // 4º posição
+    lcdSendCommand(' ', 1);                      // 5º posição
+    lcdSendCommand(scoreButton1.tens + '0', 1);  // 6º posição (dezena placar A)
+    lcdSendCommand(scoreButton1.units + '0', 1); // 7º posição (unidade placar A)
+    lcdSendCommand(' ', 1);                      // 8º posição
+    lcdSendCommand(' ', 1);                      // 9º posição
+    lcdSendCommand(' ', 1);                      // 10º posição
+    lcdSendCommand(' ', 1);                      // 11º posição
+    lcdSendCommand('B', 1);                      // 12º posição
+    lcdSendCommand(':', 1);                      // 13º posição
+    lcdSendCommand(scoreButton2.tens + '0', 1);  // 14º posição (dezena placar B)
+    lcdSendCommand(scoreButton2.units + '0', 1); // 15º posição (unidade placar B)
+    lcdSendCommand(' ', 1);                      // 16º posição
     // Linha 2: MM:SS.CC X(anim)
-    lcdSendCommand(0xC0, 0); // Início da linha 2
-    lcdSendCommand(timer.minute + '0', 1);
-    lcdSendCommand(':', 1);
-    lcdSendCommand(timer.secondTens + '0', 1);
-    lcdSendCommand(timer.secondUnits + '0', 1);
-    lcdSendCommand('.', 1);
-    lcdSendCommand(timer.msTens + '0', 1);
-    lcdSendCommand(timer.msUnits + '0', 1);
-    lcdSendCommand(' ', 1);
-    lcdSendCommand(0, 1); // Caractere animado (posição X)
+    lcdSendCommand(0xC0, 0);                    // Início da linha 2
+    lcdSendCommand(' ', 1);                     // 1º posição
+    lcdSendCommand(' ', 1);                     // 2º posição
+    lcdSendCommand(' ', 1);                     // 3º posição
+    lcdSendCommand(' ', 1);                     // 4º posição
+    lcdSendCommand(' ', 1);                     // 5º posição
+    lcdSendCommand(timer.minute + '0', 1);      // 6º posição (minuto)
+    lcdSendCommand(':', 1);                     // 7º posição
+    lcdSendCommand(timer.secondTens + '0', 1);  // 8º posição (dezena segundo)
+    lcdSendCommand(timer.secondUnits + '0', 1); // 9º posição (unidade segundo)
+    lcdSendCommand('.', 1);                     // 10º posição
+    lcdSendCommand(timer.msTens + '0', 1);      // 11º posição (dezena milissegundo)
+    lcdSendCommand(timer.msUnits + '0', 1);     // 12º posição (unidade milissegundo)
+    lcdSendCommand(' ', 1);                     // 13º posição
+    lcdSendCommand(0, 1);                       // 14º posição Caractere animado (posição X)
+    lcdSendCommand(' ', 1);                     // 15º posição
+    lcdSendCommand(' ', 1);                     // 16º posição
 }
 
 void updateDisplay()
