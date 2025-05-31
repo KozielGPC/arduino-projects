@@ -1,9 +1,6 @@
 // --------------------------------------------------
 // Placar Eletrônico com LCD, Animação e Cronômetro
 // --------------------------------------------------
-// Toda a lógica, variáveis e funções estão documentadas para facilitar o entendimento.
-// Este é o arquivo principal do sistema de placar, responsável pela lógica do cronômetro,
-// controle dos botões de placar e comunicação com o display LCD.
 
 // Proteção contra inclusão múltipla (header guard)
 #ifndef _DEF_PRINCIPAIS_H
@@ -350,4 +347,3 @@ void loop()
         updateDisplay(); // Atualiza display e animação
     }
 }
-// Fim do arquivo
