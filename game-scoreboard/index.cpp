@@ -88,30 +88,41 @@ void lcdInit4Bit()
 
 // Button debounce and scoreboard variables
 #define DEBOUNCE_INTERVAL 1
-unsigned int debounceTime1 = 0;
-unsigned int debounceTime2 = 0;
-int lastButtonState1 = 1;
-int lastButtonState2 = 1;
-int button1State = 1;
-int button2State = 1;
 
-char score1Units = 0, score1Tens = 0;
-char score2Units = 0, score2Tens = 0;
-unsigned char score1 = 0;
-unsigned char score2 = 0;
+typedef struct
+{
+    unsigned char value;
+    char units;
+    char tens;
+    int lastButtonState;
+    int buttonState;
+    unsigned int debounceTime;
+    int pin;
+} ScoreButton;
 
-// Timer variables
-int minute, secondTens, secondUnits, msTens, msUnits;
-long timerValue, startTime = 599000;
+typedef struct
+{
+    int minute;
+    int secondTens;
+    int secondUnits;
+    int msTens;
+    int msUnits;
+    long value;
+    long start;
+} Timer;
+
+ScoreButton scoreButton1 = {0, 0, 0, 1, 1, 0, PD6};
+ScoreButton scoreButton2 = {0, 0, 0, 1, 1, 0, PD7};
+Timer timer = {0, 0, 0, 0, 0, 0, 599000};
 
 const unsigned char lcdTitle[] PROGMEM = "Cronometro";
 
 void initializeHardware();
 void initializeDisplay();
 void updateTimerValues();
-void handleButtonPress(unsigned char *score, char *units, char *tens, int *lastButtonState, int *buttonState, unsigned int *debounceTime, int pin);
+void handleButtonPress(ScoreButton *scoreBtn);
 void updateDisplay();
-void updateScore(unsigned char *score, char *units, char *tens);
+void updateScore(ScoreButton *scoreBtn);
 
 void setup()
 {
@@ -125,8 +136,8 @@ void initializeHardware()
     DDRD = 0b00111111;
     PORTD = 0b11000000;
     lcdInit4Bit();
-    if (startTime > 599000)
-        startTime = 599000;
+    if (timer.start > 599000)
+        timer.start = 599000;
 }
 
 void initializeDisplay()
@@ -144,71 +155,67 @@ void initializeDisplay()
 
 void updateTimerValues()
 {
-    timerValue = startTime - millis();
-    minute = timerValue / 60000;
-    secondTens = (timerValue % 60000) / 10000;
-    secondUnits = (timerValue % 10000) / 1000;
-    msTens = (timerValue % 1000) / 100;
-    msUnits = (timerValue % 100) / 10;
+    timer.value = timer.start - millis();
+    timer.minute = timer.value / 60000;
+    timer.secondTens = (timer.value % 60000) / 10000;
+    timer.secondUnits = (timer.value % 10000) / 1000;
+    timer.msTens = (timer.value % 1000) / 100;
+    timer.msUnits = (timer.value % 100) / 10;
 }
 
-void handleButtonPress(unsigned char *score, char *units, char *tens, int *lastButtonState, int *buttonState, unsigned int *debounceTime, int pin)
+void handleButtonPress(ScoreButton *scoreBtn)
 {
-    int readButton = PIND & (1 << pin);
-    if (readButton != *lastButtonState)
-        *debounceTime = millis();
-    if ((millis() - *debounceTime) > DEBOUNCE_INTERVAL)
+    int readButton = PIND & (1 << scoreBtn->pin);
+    if (readButton != scoreBtn->lastButtonState)
+        scoreBtn->debounceTime = millis();
+    if ((millis() - scoreBtn->debounceTime) > DEBOUNCE_INTERVAL)
     {
-        if (*buttonState != readButton)
+        if (scoreBtn->buttonState != readButton)
         {
-            *buttonState = readButton;
-            if (*buttonState == 0)
-                updateScore(score, units, tens);
+            scoreBtn->buttonState = readButton;
+            if (scoreBtn->buttonState == 0)
+                updateScore(scoreBtn);
         }
     }
-    *lastButtonState = readButton;
+    scoreBtn->lastButtonState = readButton;
 }
 
-void updateScore(unsigned char *score, char *units, char *tens)
+void updateScore(ScoreButton *scoreBtn)
 {
-    if (*score == 99)
-    {
-        *score = 0;
-    }
+    if (scoreBtn->value == 99)
+        scoreBtn->value = 0;
     else
-    {
-        (*score)++;
-    }
-    *units = *score % 10;
-    *tens = *score / 10;
+        scoreBtn->value++;
+    scoreBtn->units = scoreBtn->value % 10;
+    scoreBtn->tens = scoreBtn->value / 10;
 }
 
 void updateDisplay()
 {
     lcdSendCommand(0xC4, 0);
     lcdSendCommand('0', 1);
-    lcdSendCommand(minute + '0', 1);
+    lcdSendCommand(timer.minute + '0', 1);
     lcdSendCommand(':', 1);
-    lcdSendCommand(secondTens + '0', 1);
-    lcdSendCommand(secondUnits + '0', 1);
+    lcdSendCommand(timer.secondTens + '0', 1);
+    lcdSendCommand(timer.secondUnits + '0', 1);
     lcdSendCommand(':', 1);
-    lcdSendCommand(msTens + '0', 1);
-    lcdSendCommand(msUnits + '0', 1);
+    lcdSendCommand(timer.msTens + '0', 1);
+    lcdSendCommand(timer.msUnits + '0', 1);
     lcdSendCommand(0xC0, 0);
-    lcdSendCommand(score1Tens + '0', 1);
-    lcdSendCommand(score1Units + '0', 1);
+    lcdSendCommand(scoreButton1.tens + '0', 1);
+    lcdSendCommand(scoreButton1.units + '0', 1);
     lcdSendCommand(0xCE, 0);
-    lcdSendCommand(score2Tens + '0', 1);
-    lcdSendCommand(score2Units + '0', 1);
+    lcdSendCommand(scoreButton2.tens + '0', 1);
+    lcdSendCommand(scoreButton2.units + '0', 1);
 }
 
 void loop()
 {
     updateTimerValues();
-    if (timerValue > 0)
+    if (timer.value > 0)
     {
-        handleButtonPress(&score1, &score1Units, &score1Tens, &lastButtonState1, &button1State, &debounceTime1, PD6);
-        handleButtonPress(&score2, &score2Units, &score2Tens, &lastButtonState2, &button2State, &debounceTime2, PD7);
+        handleButtonPress(&scoreButton1);
+        handleButtonPress(&scoreButton2);
     }
     if (millis() % 27 == 0)
     {
