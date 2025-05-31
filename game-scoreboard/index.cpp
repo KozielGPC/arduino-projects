@@ -124,10 +124,24 @@ void handleButtonPress(ScoreButton *scoreBtn);
 void updateDisplay();
 void updateScore(ScoreButton *scoreBtn);
 
+// Caracteres customizados para animação (3 frames)
+const uint8_t animFrames[3][8] = {
+    {0b00100, 0b01110, 0b10101, 0b00100, 0b00100, 0b10101, 0b01110, 0b00100}, // Frame 1
+    {0b00100, 0b01110, 0b10101, 0b00100, 0b01110, 0b00100, 0b10101, 0b01110}, // Frame 2
+    {0b00100, 0b01110, 0b10101, 0b01110, 0b00100, 0b01110, 0b10101, 0b00100}  // Frame 3
+};
+
+void lcdCreateChar(uint8_t location, const uint8_t *charmap);
+void displayLayout();
+
+uint8_t animIndex = 0;
+unsigned long lastAnimTime = 0;
+
 void setup()
 {
     initializeHardware();
     initializeDisplay();
+    lcdCreateChar(0, animFrames[0]);
 }
 
 void initializeHardware()
@@ -190,23 +204,52 @@ void updateScore(ScoreButton *scoreBtn)
     scoreBtn->tens = scoreBtn->value / 10;
 }
 
-void updateDisplay()
+void lcdCreateChar(uint8_t location, const uint8_t *charmap)
 {
-    lcdSendCommand(0xC4, 0);
-    lcdSendCommand('0', 1);
+    lcdSendCommand(0x40 | ((location & 0x7) << 3), 0); // Endereço CGRAM
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        lcdSendCommand(charmap[i], 1);
+    }
+}
+
+void displayLayout()
+{
+    // Linha 1: A:placar1   B:placar2
+    lcdSendCommand(0x80, 0); // Início da linha 1
+    lcdSendCommand('A', 1);
+    lcdSendCommand(':', 1);
+    lcdSendCommand(scoreButton1.tens + '0', 1);
+    lcdSendCommand(scoreButton1.units + '0', 1);
+    lcdSendCommand(' ', 1);
+    lcdSendCommand(' ', 1);
+    lcdSendCommand('B', 1);
+    lcdSendCommand(':', 1);
+    lcdSendCommand(scoreButton2.tens + '0', 1);
+    lcdSendCommand(scoreButton2.units + '0', 1);
+    // Linha 2: MM:SS.CC X(anim)
+    lcdSendCommand(0xC0, 0); // Início da linha 2
     lcdSendCommand(timer.minute + '0', 1);
     lcdSendCommand(':', 1);
     lcdSendCommand(timer.secondTens + '0', 1);
     lcdSendCommand(timer.secondUnits + '0', 1);
-    lcdSendCommand(':', 1);
+    lcdSendCommand('.', 1);
     lcdSendCommand(timer.msTens + '0', 1);
     lcdSendCommand(timer.msUnits + '0', 1);
-    lcdSendCommand(0xC0, 0);
-    lcdSendCommand(scoreButton1.tens + '0', 1);
-    lcdSendCommand(scoreButton1.units + '0', 1);
-    lcdSendCommand(0xCE, 0);
-    lcdSendCommand(scoreButton2.tens + '0', 1);
-    lcdSendCommand(scoreButton2.units + '0', 1);
+    lcdSendCommand(' ', 1);
+    lcdSendCommand(0, 1); // Caractere animado (posição X)
+}
+
+void updateDisplay()
+{
+    // Atualiza frame da animação a cada 130ms
+    if (millis() - lastAnimTime > 130)
+    {
+        lcdCreateChar(0, animFrames[animIndex]);
+        animIndex = (animIndex + 1) % 3;
+        lastAnimTime = millis();
+    }
+    displayLayout();
 }
 
 void loop()
