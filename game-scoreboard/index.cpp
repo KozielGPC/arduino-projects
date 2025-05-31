@@ -124,12 +124,35 @@ void handleButtonPress(ScoreButton *scoreBtn);
 void updateDisplay();
 void updateScore(ScoreButton *scoreBtn);
 
-// Caracteres customizados para animação (3 frames)
+// Caracteres customizados para animação (3 frames): coração, smiley, estrela
 const uint8_t animFrames[3][8] = {
-    {0b00100, 0b01110, 0b10101, 0b00100, 0b00100, 0b10101, 0b01110, 0b00100}, // Frame 1
-    {0b00100, 0b01110, 0b10101, 0b00100, 0b01110, 0b00100, 0b10101, 0b01110}, // Frame 2
-    {0b00100, 0b01110, 0b10101, 0b01110, 0b00100, 0b01110, 0b10101, 0b00100}  // Frame 3
-};
+    // Frame 1: Coração
+    {0b00000,
+     0b01010,
+     0b11111,
+     0b11111,
+     0b11111,
+     0b01110,
+     0b00100,
+     0b00000},
+    // Frame 2: Smiley
+    {0b00000,
+     0b01010,
+     0b01010,
+     0b00000,
+     0b10001,
+     0b01110,
+     0b00000,
+     0b00000},
+    // Frame 3: Estrela
+    {0b00100,
+     0b10101,
+     0b01110,
+     0b11111,
+     0b01110,
+     0b10101,
+     0b00100,
+     0b00000}};
 
 void lcdCreateChar(uint8_t location, const uint8_t *charmap);
 void displayLayout();
