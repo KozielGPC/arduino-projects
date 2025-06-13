@@ -135,18 +135,18 @@ void handle_command(const char *cmd)
 {
     if (strncmp(cmd, "A13", 3) == 0)
     {
-        set_led(LED1_PIN, LED_ON);        // Liga LED1
-        serial_send_string("LIGA PB5\n"); // Confirmação
+        set_led(LED1_PIN, LED_ON);                                 // Liga LED1
+        serial_send_string("====== Ligando PB5 - LED 1 ======\n"); // Confirmação
     }
     else if (strncmp(cmd, "S13", 3) == 0)
     {
-        set_led(LED1_PIN, LED_OFF);        // Desliga LED1
-        serial_send_string("APAGA PB5\n"); // Confirmação
+        set_led(LED1_PIN, LED_OFF);                                   // Desliga LED1
+        serial_send_string("====== Desligando PB5 - LED 1 ======\n"); // Confirmação
     }
     else if (strncmp(cmd, "D12", 3) == 0)
     {
-        set_led(LED2_PIN, LED_TOGGLE);       // Alterna LED2
-        serial_send_string("ALTERNA PB4\n"); // Confirmação
+        set_led(LED2_PIN, LED_TOGGLE);                                // Alterna LED2
+        serial_send_string("====== Alternando PB4 - LED 2 ======\n"); // Confirmação
     }
 }
 
